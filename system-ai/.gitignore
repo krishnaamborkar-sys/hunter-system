@@ -1,0 +1,14 @@
+# Local secrets/configuration
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+secrets.json
+
+# Python/runtime files
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
