@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>HUNTER SYSTEM — Motion Combat</title>
+<style>
+:root{--bg:#080b14;--panel:#111a2b;--cyan:#64e8ff;--purple:#9a72ff;--red:#ff526b;--green:#73f5ad}
+*{box-sizing:border-box} body{margin:0;background:radial-gradient(ellipse at 50% 0%,#172447 0,#080b14 60%);color:#eef5ff;font-family:system-ui,-apple-system,Segoe UI,sans-serif;min-height:100vh}
+header{display:flex;justify-content:space-between;align-items:center;padding:12px 16px;border-bottom:1px solid #263454;background:#080b14cc;position:sticky;top:0;z-index:3}
+.brand{font-weight:900;letter-spacing:2px;color:var(--cyan)}.rank{font-size:12px;color:#b7c4e8;border:1px solid #344469;border-radius:99px;padding:5px 9px}
+main{max-width:1000px;margin:auto;padding:14px;display:grid;gap:12px}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.stat,.panel{background:linear-gradient(145deg,#121c30,#0c1220);border:1px solid #263554;border-radius:14px;padding:11px}.stat small{color:#91a4cc;display:block;font-size:11px}.stat strong{font-size:20px}
+.arena{position:relative;border:1px solid #31446b;border-radius:18px;overflow:hidden;background:#080d1b;min-height:310px;aspect-ratio:16/9}
+#scene{width:100%;height:100%;display:block;position:absolute;inset:0}
+#camera{position:absolute;right:10px;bottom:10px;width:25%;max-width:150px;border:1px solid #6deaff;border-radius:10px;transform:scaleX(-1);opacity:.82;background:#080b14}
+.overlay{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:18px;pointer-events:none;text-shadow:0 2px 12px #000}
+.overlay h1{font-size:clamp(23px,5vw,42px);margin:0;color:#fff;letter-spacing:2px}.overlay p{max-width:460px;color:#d1dcf8;font-size:14px}
+.bossbar{position:absolute;left:5%;right:5%;top:12px}.barlabel{display:flex;justify-content:space-between;font-size:11px;color:#dce7ff;margin-bottom:4px}.bar{height:9px;border-radius:99px;background:#283047;overflow:hidden}.fill{height:100%;width:100%;background:linear-gradient(90deg,#ff426c,#ff9b67);transition:width .2s}
+.playerbar{position:absolute;left:5%;bottom:12px;width:42%}.playerbar .fill{background:linear-gradient(90deg,#5de7ff,#9a72ff)}
+.controls{display:grid;grid-template-columns:1fr 1fr;gap:10px}.btn{border:1px solid #3a4d75;border-radius:12px;padding:13px;background:#17233a;color:white;font-size:14px;font-weight:750;cursor:pointer}.btn.primary{background:linear-gradient(100deg,#146b9b,#5132a5);border-color:#64e8ff}.btn:disabled{opacity:.45;cursor:not-allowed}
+.note{color:#aab8d9;font-size:12px;line-height:1.5}.status{color:var(--green);font-weight:700}.moves{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.move{padding:10px;border:1px solid #2b3a5a;border-radius:10px;background:#0b1322;text-align:center}.move b{display:block;color:var(--cyan);font-size:13px}.move span{font-size:11px;color:#aab8d9}
+#message{min-height:22px;color:#bfefff;font-size:13px;margin-top:8px}
+footer{text-align:center;color:#66779c;font-size:11px;padding:10px 20px 22px}
+@media(max-width:600px){main{padding:9px}.arena{aspect-ratio:4/3;min-height:300px}.controls{grid-template-columns:1fr}.stats strong{font-size:17px}.moves{grid-template-columns:repeat(3,1fr)}#camera{width:29%}}
+</style>
+</head>
+<body>
+<header><div class="brand">⚔ HUNTER SYSTEM</div><div class="rank">MOTION COMBAT · DEMO 0.1</div></header>
+<main>
+  <div class="stats">
+    <div class="stat"><small>HUNTER LEVEL</small><strong id="level">01</strong></div>
+    <div class="stat"><small>EXPERIENCE</small><strong id="xp">0 XP</strong></div>
+    <div class="stat"><small>GATE STATUS</small><strong id="gate">CLOSED</strong></div>
+  </div>
+  <section class="arena">
+    <canvas id="scene" width="960" height="540"></canvas>
+    <video id="camera" playsinline muted></video>
+    <div class="bossbar"><div class="barlabel"><span>SHADOW BEAST · TRAINING TARGET</span><span id="enemyText">100 / 100</span></div><div class="bar"><div id="enemyFill" class="fill"></div></div></div>
+    <div class="playerbar"><div class="barlabel"><span>HUNTER ENERGY</span><span id="energyText">100%</span></div><div class="bar"><div id="energyFill" class="fill"></div></div></div>
+    <div class="overlay" id="intro"><h1>ENTER THE GATE</h1><p>Move your hands and shoulders in front of your phone camera to trigger in-game attacks and dodges.</p></div>
+  </section>
+  <div class="controls">
+    <button class="btn primary" id="start">▶ START CAMERA & GAME</button>
+    <button class="btn" id="reset">↻ RESET TRAINING GATE</button>
+  </div>
+  <div class="panel">
+    <strong>Move set</strong>
+    <div class="moves" style="margin-top:9px">
+      <div class="move"><b>👊 PUNCH</b><span>Extend a hand forward</span></div>
+      <div class="move"><b>↔ DODGE</b><span>Lean torso left/right</span></div>
+      <div class="move"><b>🛡 GUARD</b><span>Raise both hands</span></div>
+    </div>
+    <div id="message">Ready. Tap Start and allow camera access.</div>
+  </div>
+  <div class="panel">
+    <strong>Setup & safety</strong>
+    <p class="note">Use a well-lit room and keep your full upper body visible. Keep space around you clear. This is a motion-detection game prototype, not real combat training. Use controlled movements; don't hit walls, furniture, or people.</p>
+    <p class="note">TV: open this same HTML game in a compatible browser on your phone, then use Android's screen cast/mirroring to display it on your TV. Camera permission and TV mirroring depend on your device/browser; this prototype does not guarantee separate phone-camera tracking with a TV-only browser.</p>
+  </div>
+</main>
+<footer>HUNTER SYSTEM · Prototype · Camera processing runs in your browser; this demo does not upload video.</footer>
+<script type="module">
+import { FilesetResolver, PoseLandmarker } from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14";
+const video=document.querySelector('#camera'), canvas=document.querySelector('#scene'), ctx=canvas.getContext('2d');
+const startBtn=document.querySelector('#start'), resetBtn=document.querySelector('#reset');
+let landmarker=null, stream=null, running=false, lastVideoTime=-1, lastAction=0, lastPunchL=0,lastPunchR=0;
+let enemy=100,xp=0,level=1,energy=100,playerLean=0,guard=false,attackFlash=0,dodgeFlash=0,hitText='',hitUntil=0,poseAvailable=false;
+const msg=t=>document.querySelector('#message').textContent=t;
+function updateUI(){
+ document.querySelector('#enemyText').textContent=`${Math.max(0,enemy)} / 100`;
+ document.querySelector('#enemyFill').style.width=Math.max(0,enemy)+'%';
+ document.querySelector('#energyText').textContent=Math.round(energy)+'%';
+ document.querySelector('#energyFill').style.width=energy+'%';
+ document.querySelector('#xp').textContent=xp+' XP';
+ document.querySelector('#level').textContent=String(level).padStart(2,'0');
+ document.querySelector('#gate').textContent=enemy<=0?'CLEARED':running?'ACTIVE':'CLOSED';
+}
+function reset(){enemy=100;xp=0;level=1;energy=100;hitText='';document.querySelector('#intro').style.display='flex';updateUI();msg('Gate reset. Ready for another round.');}
+resetBtn.onclick=reset;
+startBtn.onclick=async()=>{
+ if(running){running=false;startBtn.textContent='▶ RESUME GAME';msg('Game paused.');return;}
+ try{
+  msg('Checking browser camera support…');
+  if(!window.isSecureContext || !navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){
+    throw new Error('Camera access is blocked in this page context. Open the game from an HTTPS website or a localhost server, not directly as a downloaded file (file://).');
+  }
+  if(!stream){stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'user',width:{ideal:640},height:{ideal:480}},audio:false});video.srcObject=stream;await video.play();}
+  if(!landmarker){
+   msg('Loading body-tracking model…');
+   const vision=await FilesetResolver.forVisionTasks('https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm');
+   landmarker=await PoseLandmarker.createFromOptions(vision,{baseOptions:{modelAssetPath:'https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task',delegate:'GPU'},runningMode:'VIDEO',numPoses:1});
+  }
+  running=true;document.querySelector('#intro').style.display='none';startBtn.textContent='Ⅱ PAUSE GAME';msg('Camera ready. Make controlled movements and watch the game respond.');updateUI();requestAnimationFrame(loop);
+ }catch(e){msg('Could not start camera/tracking. Open this file in a modern browser over HTTPS or localhost, allow camera access, and check your internet connection. Details: '+e.message);}
+};
+function act(type){
+ const now=performance.now();if(now-lastAction<420)return;lastAction=now;
+ if(type==='PUNCH'){enemy=Math.max(0,enemy-12);xp+=10;attackFlash=1;hitText='PUNCH!';energy=Math.max(0,energy-2);}
+ if(type==='DODGE'){xp+=3;dodgeFlash=1;hitText='DODGE!';energy=Math.max(0,energy-1);}
+ if(type==='GUARD'){guard=true;hitText='GUARD!';}
+ if(enemy<=0){xp+=30;level++;enemy=100;hitText='GATE CLEARED · LEVEL UP!';}
+ updateUI();msg(hitText+'  +XP earned. Keep movements controlled.');
+}
+function detect(landmarks){
+ if(!landmarks||landmarks.length<33)return;
+ poseAvailable=true;
+ const L=landmarks[15],R=landmarks[16],LS=landmarks[11],RS=landmarks[12],nose=landmarks[0],hip=landmarks[24];
+ const visible=p=>p&&p.visibility>0.45;
+ const now=performance.now();
+ // An arm extension is approximated by wrist moving well below the shoulder in normalized image coordinates.
+ const leftExt=visible(L)&&visible(LS)&&Math.hypot(L.x-LS.x,L.y-LS.y)>0.24;
+ const rightExt=visible(R)&&visible(RS)&&Math.hypot(R.x-RS.x,R.y-RS.y)>0.24;
+ const handsUp=visible(L)&&visible(R)&&visible(LS)&&visible(RS)&&L.y<LS.y-0.06&&R.y<RS.y-0.06;
+ const lean=visible(LS)&&visible(RS)&&visible(hip)?((LS.x+RS.x)/2-hip.x):0;
+ if(leftExt&&now-lastPunchL>850){lastPunchL=now;act('PUNCH');}
+ else if(rightExt&&now-lastPunchR>850){lastPunchR=now;act('PUNCH');}
+ else if(Math.abs(lean)>0.095&&now-lastAction>600){act('DODGE');}
+ else if(handsUp&&now-lastAction>700){act('GUARD');}
+ playerLean=Math.max(-1,Math.min(1,lean*5));guard=handsUp;
+}
+function draw(){
+ const w=canvas.width,h=canvas.height,t=performance.now()/1000;
+ const g=ctx.createLinearGradient(0,0,0,h);g.addColorStop(0,'#111c3c');g.addColorStop(1,'#080b15');ctx.fillStyle=g;ctx.fillRect(0,0,w,h);
+ // stars / gate
+ for(let i=0;i<55;i++){let x=(i*173+40)%w,y=(i*97+Math.sin(t+i)*14+20)%h;ctx.fillStyle=i%3?'#334d83':'#7b70ff';ctx.globalAlpha=.25+(i%4)*.12;ctx.fillRect(x,y,2,2);}ctx.globalAlpha=1;
+ ctx.strokeStyle='#334a7a';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(0,h*.77);ctx.lineTo(w,h*.77);ctx.stroke();
+ for(let i=0;i<9;i++){ctx.strokeStyle='#26375b';ctx.beginPath();ctx.moveTo(w/2,h*.77);ctx.lineTo(i*w/8,h);ctx.stroke();}
+ // shadow beast
+ const bx=w*.72,by=h*.58+Math.sin(t*2)*5,scale=1+Math.sin(t*3)*.025;
+ ctx.save();ctx.translate(bx,by);ctx.scale(scale,scale);ctx.shadowBlur=attackFlash?38:22;ctx.shadowColor=attackFlash?'#ff6688':'#8a55ff';
+ ctx.fillStyle=attackFlash?'#b64d76':'#342c68';
+ ctx.beginPath();ctx.moveTo(-50,-90);ctx.lineTo(-35,-150);ctx.lineTo(-5,-116);ctx.lineTo(25,-160);ctx.lineTo(48,-86);ctx.lineTo(58,-20);ctx.lineTo(37,10);ctx.lineTo(48,68);ctx.lineTo(15,62);ctx.lineTo(0,10);ctx.lineTo(-17,66);ctx.lineTo(-48,70);ctx.lineTo(-33,5);ctx.lineTo(-62,-30);ctx.closePath();ctx.fill();
+ ctx.fillStyle='#ff496b';ctx.fillRect(-26,-95,12,5);ctx.fillRect(13,-95,12,5);
+ ctx.restore();
+ // hunter silhouette, leans when detected
+ const px=w*.29+playerLean*20,py=h*.61;ctx.save();ctx.translate(px,py);ctx.shadowBlur=20;ctx.shadowColor='#53ddff';ctx.fillStyle=guard?'#3a90aa':'#246a93';
+ ctx.beginPath();ctx.arc(0,-105,27,0,Math.PI*2);ctx.fill();
+ ctx.fillStyle='#14213b';ctx.fillRect(-22,-78,44,76);
+ ctx.strokeStyle='#54dfff';ctx.lineWidth=15;ctx.lineCap='round';
+ ctx.beginPath();ctx.moveTo(-12,-65);ctx.lineTo(-36+(attackFlash?45:0),-38);ctx.moveTo(12,-65);ctx.lineTo(36-(attackFlash?45:0),-38);ctx.stroke();
+ ctx.strokeStyle='#246a93';ctx.lineWidth=18;ctx.beginPath();ctx.moveTo(-10,-3);ctx.lineTo(-23,55);ctx.moveTo(10,-3);ctx.lineTo(23,55);ctx.stroke();
+ ctx.restore();
+ if(attackFlash>0){ctx.strokeStyle='#ff7594';ctx.lineWidth=9;ctx.beginPath();ctx.arc(w*.5,h*.45,85*(1.2-attackFlash),-.7,.7);ctx.stroke();attackFlash=Math.max(0,attackFlash-.06);}
+ if(dodgeFlash>0){ctx.strokeStyle='#6deaff';ctx.lineWidth=5;ctx.beginPath();ctx.ellipse(px,py,80*dodgeFlash,100*dodgeFlash,0,0,Math.PI*2);ctx.stroke();dodgeFlash=Math.max(0,dodgeFlash-.07);}
+ if(hitText&&performance.now()<hitUntil){ctx.fillStyle='#fff';ctx.font='bold 30px system-ui';ctx.textAlign='center';ctx.fillText(hitText,w/2,h*.34);}
+}
+function loop(){
+ if(!running)return;
+ if(video.readyState>=2&&video.currentTime!==lastVideoTime&&landmarker){
+  lastVideoTime=video.currentTime;
+  const result=landmarker.detectForVideo(video,performance.now());
+  if(result.landmarks&&result.landmarks.length)detect(result.landmarks[0]);else{poseAvailable=false;}
+ }
+ draw();requestAnimationFrame(loop);
+}
+updateUI();draw();
+</script>
+</body>
+</html>
