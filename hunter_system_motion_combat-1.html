@@ -37,7 +37,7 @@ footer{text-align:center;color:#66779c;font-size:11px;padding:10px 20px 22px}
     <canvas id="scene" width="960" height="540"></canvas>
     <video id="camera" playsinline muted></video>
     <div class="bossbar"><div class="barlabel"><span>SHADOW BEAST · TRAINING TARGET</span><span id="enemyText">100 / 100</span></div><div class="bar"><div id="enemyFill" class="fill"></div></div></div>
-    <div class="playerbar"><div class="barlabel"><span>HUNTER ENERGY</span><span id="energyText">100%</span></div><div class="bar"><div id="energyFill" class="fill"></div></div></div>
+    <div class="playerbar"><div class="barlabel"><span>HUNTER ENERGY</span><span id="energyText">100%</span></div><div class="bar"><div id="energyFill" class="fill"></div></div><div class="barlabel" style="margin-top:7px"><span>HUNTER HP</span><span id="hpText">100 / 100</span></div><div class="bar"><div id="hpFill" class="fill" style="background:linear-gradient(90deg,#73f5ad,#e5f879)"></div></div></div>
     <div class="overlay" id="intro"><h1>ENTER THE GATE</h1><p>Move your hands and shoulders in front of your phone camera to trigger in-game attacks and dodges.</p></div>
   </section>
   <div class="controls">
@@ -51,7 +51,7 @@ footer{text-align:center;color:#66779c;font-size:11px;padding:10px 20px 22px}
       <div class="move"><b>↔ DODGE</b><span>Lean torso left/right</span></div>
       <div class="move"><b>🛡 GUARD</b><span>Raise both hands</span></div>
     </div>
-    <div id="message">Ready. Tap Start and allow camera access.</div>
+    <div id="message">Ready. Tap Start and allow camera access.</div><div class="note" id="enemyIntent">Shadow Beast: waiting for combat to begin.</div>
   </div>
   <div class="panel">
     <strong>Setup & safety</strong>
@@ -65,18 +65,22 @@ import { FilesetResolver, PoseLandmarker } from "https://cdn.jsdelivr.net/npm/@m
 const video=document.querySelector('#camera'), canvas=document.querySelector('#scene'), ctx=canvas.getContext('2d');
 const startBtn=document.querySelector('#start'), resetBtn=document.querySelector('#reset');
 let landmarker=null, stream=null, running=false, lastVideoTime=-1, lastAction=0, lastPunchL=0,lastPunchR=0;
-let enemy=100,xp=0,level=1,energy=100,playerLean=0,guard=false,attackFlash=0,dodgeFlash=0,hitText='',hitUntil=0,poseAvailable=false,lastFrame=0,prevLWrist=null,prevRWrist=null,lastLeanAction=0,lastGuardAction=0,gateCleared=false;
+let enemy=100,xp=0,level=1,energy=100,playerLean=0,guard=false,attackFlash=0,dodgeFlash=0,hitText='',hitUntil=0,poseAvailable=false,lastFrame=0,prevLWrist=null,prevRWrist=null,lastLeanAction=0,lastGuardAction=0,gateCleared=false,hunterHP=100,enemyAttackAt=0,enemyAttackState='idle',enemyAttackEnds=0,lastDefense='none',guardUntil=0,dodgeUntil=0;
 const msg=t=>document.querySelector('#message').textContent=t;
 function updateUI(){
  document.querySelector('#enemyText').textContent=`${Math.max(0,enemy)} / 100`;
  document.querySelector('#enemyFill').style.width=Math.max(0,enemy)+'%';
  document.querySelector('#energyText').textContent=Math.round(energy)+'%';
  document.querySelector('#energyFill').style.width=energy+'%';
+ document.querySelector('#hpText').textContent=Math.round(hunterHP)+' / 100';
+ document.querySelector('#hpFill').style.width=hunterHP+'%';
+ document.querySelector('#hpFill').style.background=hunterHP<30?'linear-gradient(90deg,#ff526b,#ff9b67)':'linear-gradient(90deg,#73f5ad,#e5f879)';
+ document.querySelector('#enemyIntent').textContent=enemyAttackState==='windup'?'⚠ SHADOW BEAST ATTACK INCOMING — GUARD or DODGE!':enemyAttackState==='cooldown'?'Shadow Beast recovering…':hunterHP<=0?'Hunter exhausted — reset the gate to retry.':running?'Shadow Beast is watching for an opening.':'Shadow Beast: waiting for combat to begin.';
  document.querySelector('#xp').textContent=xp+' XP';
  document.querySelector('#level').textContent=String(level).padStart(2,'0');
  document.querySelector('#gate').textContent=gateCleared?'CLEARED':running?'ACTIVE':'CLOSED';
 }
-function reset(){enemy=100;xp=0;level=1;energy=100;hitText='';hitUntil=0;gateCleared=false;guard=false;playerLean=0;prevLWrist=null;prevRWrist=null;document.querySelector('#intro').style.display='flex';updateUI();msg('Gate reset. Ready for another round.');}
+function reset(){enemy=100;xp=0;level=1;energy=100;hunterHP=100;hitText='';hitUntil=0;gateCleared=false;guard=false;playerLean=0;prevLWrist=null;prevRWrist=null;enemyAttackState='idle';enemyAttackAt=0;enemyAttackEnds=0;lastDefense='none';guardUntil=0;dodgeUntil=0;document.querySelector('#intro').style.display='flex';updateUI();msg('Gate reset. Ready for another round.');}
 resetBtn.onclick=reset;
 startBtn.onclick=async()=>{
  if(running){running=false;startBtn.textContent='▶ RESUME GAME';msg('Game paused.');return;}
@@ -96,14 +100,25 @@ startBtn.onclick=async()=>{
 };
 function act(type){
  const now=performance.now();
- if(now-lastAction<520||energy<8||gateCleared)return;
+ if(now-lastAction<520||energy<8||gateCleared||hunterHP<=0)return;
  lastAction=now;
  if(type==='PUNCH'){enemy=Math.max(0,enemy-9);xp+=6;attackFlash=1;hitText='PUNCH · -9 HP';energy=Math.max(0,energy-8);}
- if(type==='DODGE'){xp+=2;dodgeFlash=1;hitText='DODGE · +2 XP';energy=Math.max(0,energy-5);}
- if(type==='GUARD'){hitText='GUARD · BLOCK READY';energy=Math.max(0,energy-3);}
+ if(type==='DODGE'){dodgeUntil=now+900;xp+=2;dodgeFlash=1;hitText='DODGE READY';energy=Math.max(0,energy-5);lastDefense='dodge';}
+ if(type==='GUARD'){guardUntil=now+1300;hitText='GUARD READY';energy=Math.max(0,energy-3);lastDefense='guard';}
  hitUntil=now+700;
  if(enemy<=0){gateCleared=true;xp+=20;level=Math.floor(xp/100)+1;hitText='GATE CLEARED!';hitUntil=now+1800;}
  updateUI();msg(hitText+'. Energy regenerates gradually. Use controlled movements.');
+}
+function resolveEnemyAttack(now){
+ if(!running||gateCleared||hunterHP<=0)return;
+ if(enemyAttackState==='idle'&&now>=enemyAttackAt){enemyAttackState='windup';enemyAttackEnds=now+950;hitText='BEAST ATTACK WINDING UP!';hitUntil=now+900;}
+ else if(enemyAttackState==='windup'&&now>=enemyAttackEnds){
+  if(now<dodgeUntil){xp+=4;hitText='DODGE SUCCESS · NO DAMAGE';dodgeFlash=1;msg('Perfect dodge! You avoided the Shadow Beast attack. +4 XP');}
+  else if(now<guardUntil){hunterHP=Math.max(0,hunterHP-8);hitText='BLOCKED · -8 HP';msg('Guard successful! Reduced incoming damage to 8 HP.');}
+  else {hunterHP=Math.max(0,hunterHP-20);hitText='HIT · -20 HP';msg('Shadow Beast hit! Guard or dodge during the warning next time.');}
+  hitUntil=now+1000;enemyAttackState='cooldown';enemyAttackAt=now+1800;updateUI();
+ } else if(enemyAttackState==='cooldown'&&now>=enemyAttackAt){enemyAttackState='idle';enemyAttackAt=now+1600+Math.random()*1000;}
+ if(now>=guardUntil)guard=false;
 }
 function detect(landmarks){
  if(!landmarks||landmarks.length<33)return;
@@ -140,13 +155,13 @@ function draw(){
  for(let i=0;i<9;i++){ctx.strokeStyle='#26375b';ctx.beginPath();ctx.moveTo(w/2,h*.77);ctx.lineTo(i*w/8,h);ctx.stroke();}
  // shadow beast
  const bx=w*.72,by=h*.58+Math.sin(t*2)*5,scale=1+Math.sin(t*3)*.025;
- ctx.save();ctx.translate(bx,by);ctx.scale(scale,scale);ctx.shadowBlur=attackFlash?38:22;ctx.shadowColor=attackFlash?'#ff6688':'#8a55ff';
- ctx.fillStyle=attackFlash?'#b64d76':'#342c68';
+ ctx.save();ctx.translate(bx,by);ctx.scale(scale,scale);ctx.shadowBlur=attackFlash?38:22;ctx.shadowColor=(attackFlash||enemyAttackState==='windup')?'#ff6688':'#8a55ff';
+ ctx.fillStyle=(attackFlash||enemyAttackState==='windup')?'#b64d76':'#342c68';
  ctx.beginPath();ctx.moveTo(-50,-90);ctx.lineTo(-35,-150);ctx.lineTo(-5,-116);ctx.lineTo(25,-160);ctx.lineTo(48,-86);ctx.lineTo(58,-20);ctx.lineTo(37,10);ctx.lineTo(48,68);ctx.lineTo(15,62);ctx.lineTo(0,10);ctx.lineTo(-17,66);ctx.lineTo(-48,70);ctx.lineTo(-33,5);ctx.lineTo(-62,-30);ctx.closePath();ctx.fill();
  ctx.fillStyle='#ff496b';ctx.fillRect(-26,-95,12,5);ctx.fillRect(13,-95,12,5);
  ctx.restore();
  // hunter silhouette, leans when detected
- const px=w*.29+playerLean*20,py=h*.61;ctx.save();ctx.translate(px,py);ctx.shadowBlur=20;ctx.shadowColor='#53ddff';ctx.fillStyle=guard?'#3a90aa':'#246a93';
+ const px=w*.29+playerLean*20,py=h*.61;ctx.save();ctx.translate(px,py);ctx.shadowBlur=20;ctx.shadowColor='#53ddff';ctx.fillStyle=guard?'#3a90aa':(performance.now()<dodgeUntil?'#54dfff':'#246a93');
  ctx.beginPath();ctx.arc(0,-105,27,0,Math.PI*2);ctx.fill();
  ctx.fillStyle='#14213b';ctx.fillRect(-22,-78,44,76);
  ctx.strokeStyle='#54dfff';ctx.lineWidth=15;ctx.lineCap='round';
@@ -159,7 +174,7 @@ function draw(){
 }
 function loop(){
  if(!running)return;
- const now=performance.now();const dt=Math.min(0.05,(now-lastFrame)/1000||0);lastFrame=now;energy=Math.min(100,energy+10*dt);updateUI();
+ const now=performance.now();const dt=Math.min(0.05,(now-lastFrame)/1000||0);lastFrame=now;energy=Math.min(100,energy+10*dt);resolveEnemyAttack(now);updateUI();
  if(video.readyState>=2&&video.currentTime!==lastVideoTime&&landmarker){
   lastVideoTime=video.currentTime;
   const result=landmarker.detectForVideo(video,performance.now());
