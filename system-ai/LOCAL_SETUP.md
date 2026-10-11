@@ -11,7 +11,11 @@ This runs the Python backend on the same phone and serves the dashboard from the
 
 ## 2. Get the project files
 
-Download or clone the repository files so that `app.py` and `index.html` are in the same `system-ai` folder. In Pydroid, open `app.py` from that folder.
+1. Open the repository in your phone browser: https://github.com/krishnaamborkar-sys/hunter-system
+2. Tap **Code** → **Download ZIP**.
+3. Extract the ZIP using your phone's Files app.
+4. Open the extracted `system-ai` folder and confirm that `app.py` and `index.html` are together.
+5. In Pydroid 3, use **Open** to select `app.py` from that folder.
 
 ## 3. Start the server
 
@@ -55,3 +59,13 @@ GitHub Pages serves static files only; it cannot run `app.py`. Use `https://kris
 - No chat history is written to disk.
 - Do not add camera, microphone, accessibility, SMS, contacts, or background permissions without a clear need and an explicit on/off control.
 - If an external AI provider is configured, message text is sent to that provider. Do not send passwords, API keys, private documents, or sensitive personal information.
+
+## Optional backend smoke tests
+
+If you can run Python commands in the same project folder, run:
+
+```bash
+python -m unittest test_backend.py
+```
+
+The tests check the health endpoint, dashboard route, basic study reply, input limits, and search-link endpoint. They require Flask to be installed.
