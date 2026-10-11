@@ -1,50 +1,62 @@
-# SYSTEM AI — Hybrid JARVIS Starter
+# SYSTEM AI — Phone-first JARVIS prototype
 
-This folder is the first development area for Krishna's phone-first SYSTEM AI project. The existing Hunter System game at the repository root is left unchanged.
+SYSTEM AI is a phone-first personal assistant prototype for Android. The existing Hunter System game at the repository root is unchanged.
 
-## What's included
+## Project files
 
-- `index.html`: mobile-friendly dashboard, local command interface, 25-minute focus timer, and browser speech features where supported.
-- `system_ai.py`: a standard-library-only Python command-line core.
-- This README: setup notes and an honest status of the integrations.
+- `index.html` — mobile dashboard, command interface, 25-minute focus timer, opt-in browser voice controls, and Google search links.
+- `app.py` — Flask backend that serves the dashboard locally and exposes `/api/health` and `/api/chat`.
+- `requirements.txt` — backend dependency.
+- `LOCAL_SETUP.md` — Android/Pydroid setup guide.
+- `.env.example` — names of optional server-side environment variables; contains no real secrets.
+- `system_ai.py` — original standard-library command-line prototype.
 
-## Current capabilities
+## What works now
 
-In the dashboard, try `help`, `study`, `quest`, `profile`, `status`, `start timer`, `pause timer`, `reset timer`, or `time`. Use **Speak command** to try speech recognition in a supported browser; it is opt-in and not always listening. Spoken replies depend on browser support and can be turned off.
+### Static GitHub Pages dashboard
 
-The Python core separately supports local command-line actions. The browser dashboard and Python script are not connected to each other yet.
+Open: https://krishnaamborkar-sys.github.io/hunter-system/system-ai/
 
-## Not connected yet
+- Local dashboard commands and a 25-minute focus timer.
+- Browser speech recognition where supported; it starts only when the user taps the microphone button.
+- Spoken responses where supported; can be switched off.
+- `search: your topic` or `google your topic` creates a Google search link.
+- This static page cannot run Python by itself. Chat remains a limited local helper when opened on GitHub Pages.
 
-ChatGPT/OpenAI API, Google/web search, persistent memory, camera-based motion detection, and native Android controls are **not connected**. Browser speech support varies by browser and device. The dashboard labels these limits instead of pretending they work.
+### Local Python backend on Android
 
-## Open the dashboard
+Follow [LOCAL_SETUP.md](LOCAL_SETUP.md). With Flask installed in Pydroid 3, run `app.py` and open `http://127.0.0.1:8765` on the same phone.
 
-After GitHub Pages publishes the folder, open:
+- The Python server binds to `127.0.0.1` only.
+- The locally served dashboard sends chat messages to `/api/chat`.
+- `/api/health` reports the backend mode.
+- Messages are not written to a chat-history file.
+- Without an AI provider configured, the backend uses a small command helper, **not a generative language model**.
+- Google searches open in Google; this project does not scrape search results.
 
-`https://krishnaamborkar-sys.github.io/hunter-system/system-ai/`
+## AI model status
 
-If it does not load immediately, check **GitHub → repository Settings → Pages** to confirm Pages is enabled for the `main` branch, then wait for the deployment to finish.
+The backend contains an optional adapter for an OpenAI-compatible HTTPS chat-completions endpoint. It is disabled unless `SYSTEM_AI_API_BASE`, `SYSTEM_AI_API_KEY`, and `SYSTEM_AI_MODEL` are provided as server-side environment variables. Do not put real credentials in this repository, in browser JavaScript, or in chat.
 
-## Run the Python core
+This repository does **not** include a bundled generative model, and no AI provider is connected by default. A truly free generative model running entirely on Android depends on compatible model software, device memory, and CPU support; this project does not claim that has already been achieved. Use only services whose terms you are eligible to use. If you have no suitable free provider, keep the optional variables unset.
 
-On a computer with Python 3, or in an Android Python environment that supports console input:
+## Not implemented
 
-```bash
-python system_ai.py
-```
+- ChatGPT/OpenAI connection or any other live AI provider by default.
+- Google search result ingestion; search opens the Google results page.
+- Cloud-synced memory or accounts.
+- Camera/motion recognition, accessibility service, SMS/contacts access, or unrestricted Android control.
+- Background listening. Voice input remains user-triggered.
 
-## Planned architecture
+## Privacy and security
 
-1. **Core:** commands, configuration, and explicit local preferences.
-2. **AI + search:** a backend service that keeps API secrets server-side; never put secret API keys in browser JavaScript or a public repository.
-3. **Voice:** opt-in speech input and spoken responses.
-4. **Android bridge:** a dedicated Android app or supported automation integration, with explicit permissions and visible controls.
-5. **Motion:** add session monitoring only with clear consent and a visible on/off control.
-
-## Safety and privacy rules
-
-- Never commit API keys, passwords, access tokens, or private user data.
+- Never commit API keys, passwords, tokens, or private personal data.
+- `.gitignore` excludes local `.env` files and common secret files, but still inspect every commit before pushing.
+- If an external AI provider is configured, the user's message is sent to that provider.
 - Ask before enabling microphone, camera, accessibility, or background behavior.
-- Prefer the minimum Android permissions needed for each feature.
+- Keep permissions minimal and visible.
 - Do not claim an integration is active until it has been connected and tested.
+
+## Existing game
+
+The existing Hunter System game remains in the repository root. SYSTEM AI lives in the `system-ai/` folder so the projects stay separate.
