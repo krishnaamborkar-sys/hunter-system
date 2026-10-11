@@ -75,12 +75,12 @@ function updateUI(){
  document.querySelector('#hpText').textContent=Math.round(hunterHP)+' / 100';
  document.querySelector('#hpFill').style.width=hunterHP+'%';
  document.querySelector('#hpFill').style.background=hunterHP<30?'linear-gradient(90deg,#ff526b,#ff9b67)':'linear-gradient(90deg,#73f5ad,#e5f879)';
- document.querySelector('#enemyIntent').textContent=enemyAttackState==='windup'?'⚠ SHADOW BEAST ATTACK INCOMING — GUARD or DODGE!':enemyAttackState==='cooldown'?'Shadow Beast recovering…':hunterHP<=0?'Hunter exhausted — reset the gate to retry.':running?'Shadow Beast is watching for an opening.':'Shadow Beast: waiting for combat to begin.';
+ document.querySelector('#enemyIntent').textContent=hunterHP<=0?'Hunter exhausted — reset the gate to retry.':enemyAttackState==='windup'?'⚠ SHADOW BEAST ATTACK INCOMING — GUARD or DODGE!':enemyAttackState==='cooldown'?'Shadow Beast recovering…':running?'Shadow Beast is watching for an opening.':'Shadow Beast: waiting for combat to begin.';
  document.querySelector('#xp').textContent=xp+' XP';
  document.querySelector('#level').textContent=String(level).padStart(2,'0');
- document.querySelector('#gate').textContent=gateCleared?'CLEARED':running?'ACTIVE':'CLOSED';
+ document.querySelector('#gate').textContent=gateCleared?'CLEARED':hunterHP<=0?'DEFEATED':running?'ACTIVE':'CLOSED';
 }
-function reset(){enemy=100;xp=0;level=1;energy=100;hunterHP=100;hitText='';hitUntil=0;gateCleared=false;guard=false;playerLean=0;prevLWrist=null;prevRWrist=null;enemyAttackState='idle';enemyAttackAt=0;enemyAttackEnds=0;lastDefense='none';guardUntil=0;dodgeUntil=0;document.querySelector('#intro').style.display='flex';updateUI();msg('Gate reset. Ready for another round.');}
+function reset(){enemy=100;xp=0;level=1;energy=100;hunterHP=100;hitText='';hitUntil=0;gateCleared=false;guard=false;playerLean=0;prevLWrist=null;prevRWrist=null;enemyAttackState='idle';enemyAttackAt=0;enemyAttackEnds=0;lastDefense='none';guardUntil=0;dodgeUntil=0;if(!running)document.querySelector('#intro').style.display='flex';else document.querySelector('#intro').style.display='none';updateUI();msg('Gate reset. Ready for another round. Watch for the attack warning.');}
 resetBtn.onclick=reset;
 startBtn.onclick=async()=>{
  if(running){running=false;startBtn.textContent='▶ RESUME GAME';msg('Game paused.');return;}
@@ -95,7 +95,7 @@ startBtn.onclick=async()=>{
    const vision=await FilesetResolver.forVisionTasks('https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm');
    landmarker=await PoseLandmarker.createFromOptions(vision,{baseOptions:{modelAssetPath:'https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task',delegate:'GPU'},runningMode:'VIDEO',numPoses:1});
   }
-  running=true;document.querySelector('#intro').style.display='none';startBtn.textContent='Ⅱ PAUSE GAME';msg('Camera ready. Quick controlled punches, a clear side lean, or both hands raised trigger moves. Energy regenerates slowly.');lastFrame=performance.now();updateUI();requestAnimationFrame(loop);
+  running=true;document.querySelector('#intro').style.display='none';startBtn.textContent='Ⅱ PAUSE GAME';if(enemyAttackAt===0)enemyAttackAt=performance.now()+3200;msg('Camera ready. Shadow Beast attacks after a warning. Dodge with a clear side lean or raise both hands to guard.');lastFrame=performance.now();updateUI();requestAnimationFrame(loop);
  }catch(e){msg('Could not start camera/tracking. Open this file in a modern browser over HTTPS or localhost, allow camera access, and check your internet connection. Details: '+e.message);}
 };
 function act(type){
@@ -103,7 +103,7 @@ function act(type){
  if(now-lastAction<520||energy<8||gateCleared||hunterHP<=0)return;
  lastAction=now;
  if(type==='PUNCH'){enemy=Math.max(0,enemy-9);xp+=6;attackFlash=1;hitText='PUNCH · -9 HP';energy=Math.max(0,energy-8);}
- if(type==='DODGE'){dodgeUntil=now+900;xp+=2;dodgeFlash=1;hitText='DODGE READY';energy=Math.max(0,energy-5);lastDefense='dodge';}
+ if(type==='DODGE'){dodgeUntil=now+1450;xp+=2;dodgeFlash=1;hitText='DODGE READY';energy=Math.max(0,energy-5);lastDefense='dodge';}
  if(type==='GUARD'){guardUntil=now+1300;hitText='GUARD READY';energy=Math.max(0,energy-3);lastDefense='guard';}
  hitUntil=now+700;
  if(enemy<=0){gateCleared=true;xp+=20;level=Math.floor(xp/100)+1;hitText='GATE CLEARED!';hitUntil=now+1800;}
@@ -111,13 +111,13 @@ function act(type){
 }
 function resolveEnemyAttack(now){
  if(!running||gateCleared||hunterHP<=0)return;
- if(enemyAttackState==='idle'&&now>=enemyAttackAt){enemyAttackState='windup';enemyAttackEnds=now+950;hitText='BEAST ATTACK WINDING UP!';hitUntil=now+900;}
+ if(enemyAttackState==='idle'&&now>=enemyAttackAt){enemyAttackState='windup';enemyAttackEnds=now+1250;hitText='BEAST ATTACK WINDING UP!';hitUntil=now+1250;msg('Incoming attack! You have 1.25 seconds to dodge or raise both hands to guard.');updateUI();}
  else if(enemyAttackState==='windup'&&now>=enemyAttackEnds){
   if(now<dodgeUntil){xp+=4;hitText='DODGE SUCCESS · NO DAMAGE';dodgeFlash=1;msg('Perfect dodge! You avoided the Shadow Beast attack. +4 XP');}
   else if(now<guardUntil){hunterHP=Math.max(0,hunterHP-8);hitText='BLOCKED · -8 HP';msg('Guard successful! Reduced incoming damage to 8 HP.');}
   else {hunterHP=Math.max(0,hunterHP-20);hitText='HIT · -20 HP';msg('Shadow Beast hit! Guard or dodge during the warning next time.');}
-  hitUntil=now+1000;enemyAttackState='cooldown';enemyAttackAt=now+1800;updateUI();
- } else if(enemyAttackState==='cooldown'&&now>=enemyAttackAt){enemyAttackState='idle';enemyAttackAt=now+1600+Math.random()*1000;}
+  hitUntil=now+1000;enemyAttackState='cooldown';enemyAttackAt=now+2100;updateUI();
+ } else if(enemyAttackState==='cooldown'&&now>=enemyAttackAt){enemyAttackState='idle';enemyAttackAt=now+1900+Math.random()*1200;}
  if(now>=guardUntil)guard=false;
 }
 function detect(landmarks){
